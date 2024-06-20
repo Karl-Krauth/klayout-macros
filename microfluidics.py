@@ -53,81 +53,124 @@ class Tree(pya.PCellDeclarationHelper):
             + (self.num_levels - 1) * self.control_gap
         )
         self.make_tree(
-            top=height / 2, left=-width / 2, right=width / 2, level=self.num_levels
+            top=height / 2,
+            left=-width / 2,
+            right=width / 2,
+            top_offset=0,
+            level=self.num_levels,
         )
 
-    def make_tree(self, top, left, right, level):
+    def make_tree(self, top, left, right, top_offset, level):
         control_shapes = self.cell.shapes(self.control_layer)
         flow_shapes = self.cell.shapes(self.flow_layer)
         mid = (left + right) / 2
-        q1 = 0.75 * left + 0.25 * right
-        q3 = 0.25 * left + 0.75 * right
-        root_left = mid - self.flow_width / 2
-        root_right = mid + self.flow_width / 2
-        root_top = top
         if level == 0:
             flow_shapes.insert(
                 pya.DBox(
-                    root_left,
-                    root_top
-                    - self.flow_width
-                    - self.vertical_gap
+                    mid - self.flow_width / 2,
+                    top
+                    - 2 * self.flow_width
+                    - 1.5 * self.vertical_gap
                     - self.control_width,
-                    root_right,
-                    root_top,
+                    mid + self.flow_width / 2,
+                    top - top_offset,
                 )
             )
             return
         else:
-            root_bottom = (
-                root_top
+            root = pya.DBox(
+                mid - self.flow_width / 2,
+                top
                 - 2 * self.flow_width
                 - 2 * self.vertical_gap
                 - 2 * self.control_width
-                - self.control_gap
+                - self.control_gap,
+                mid + self.flow_width / 2,
+                top - top_offset,
             )
-            flow_shapes.insert(
-                pya.DBox(
-                    root_left,
-                    root_bottom,
-                    root_right,
-                    root_top,
-                )
+            flow_shapes.insert(root)
+
+            left_control = pya.DBox(
+                root.left - self.horizontal_gap - self.control_width,
+                root.bottom - self.vertical_gap / 2,
+                root.left - self.horizontal_gap,
+                root.bottom + self.flow_width + self.vertical_gap + self.control_width,
             )
-            flow_shapes.insert(
-                pya.DBox(
-                    q1 - self.flow_width / 2,
-                    root_bottom,
-                    q3 + self.flow_width / 2,
-                    root_bottom + self.flow_width,
-                )
+            control_shapes.insert(left_control)
+            right_control = pya.DBox(
+                root.right + self.horizontal_gap,
+                root.bottom - self.vertical_gap - self.control_width,
+                root.right + self.horizontal_gap + self.control_width,
+                root.bottom + self.flow_width + self.vertical_gap / 2,
             )
-            control_shapes.insert(
-                pya.DBox(
-                    root_left - self.horizontal_gap - self.control_width,
-                    root_bottom - self.vertical_gap / 2,
-                    root_left - self.horizontal_gap,
-                    root_bottom + self.flow_width + self.vertical_gap + self.control_width,
+            control_shapes.insert(right_control)
+
+            offset = 0
+            q1 = 0.75 * left + 0.25 * right
+            q3 = 0.25 * left + 0.75 * right
+            split = pya.DBox(
+                q1 - self.flow_width / 2,
+                root.bottom,
+                q3 + self.flow_width / 2,
+                root.bottom + self.flow_width,
+            )
+
+            if split.left + self.flow_width + self.horizontal_gap > left_control.left:
+                offset = split.top - (right_control.bottom - self.vertical_gap / 2)
+                split.left = max(
+                    left, left_control.left - self.horizontal_gap - self.flow_width
                 )
-                                )
-            control_shapes.insert(
-                pya.DBox(
-                    root_right + self.horizontal_gap,
-                    root_bottom - self.vertical_gap - self.control_width,
-                    root_right + self.horizontal_gap + self.control_width,
-                    root_bottom + self.flow_width + self.vertical_gap / 2,
+                split.right = min(
+                    right, right_control.right + self.horizontal_gap + self.flow_width
                 )
-                                )
+                left_flow = pya.DBox(
+                    split.left,
+                    right_control.bottom - self.vertical_gap / 2 - self.flow_width,
+                    split.left + self.flow_width,
+                    split.top,
+                )
+                flow_shapes.insert(left_flow)
+
+                right_flow = pya.DBox(
+                    split.right,
+                    right_control.bottom - self.vertical_gap / 2 - self.flow_width,
+                    split.right - self.flow_width,
+                    split.top,
+                )
+                flow_shapes.insert(right_flow)
+
+                flow_shapes.insert(
+                    pya.DBox(
+                        q3 - self.flow_width / 2,
+                        right_flow.bottom,
+                        right_flow.right,
+                        right_flow.bottom + self.flow_width,
+                    )
+                )
+                flow_shapes.insert(
+                    pya.DBox(
+                        left_flow.left,
+                        left_flow.bottom,
+                        q1 + self.flow_width / 2,
+                        left_flow.bottom + self.flow_width,
+                    )
+                )
+            else:
+                offset = 0
+
+            flow_shapes.insert(split)
             self.make_tree(
-                top=root_bottom + self.flow_width,
+                top=root.bottom + self.flow_width,
                 left=left,
                 right=mid,
+                top_offset=offset,
                 level=level - 1,
             )
             self.make_tree(
-                top=root_bottom + self.flow_width,
+                top=root.bottom + self.flow_width,
                 left=mid,
                 right=right,
+                top_offset=offset,
                 level=level - 1,
             )
 
