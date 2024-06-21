@@ -52,13 +52,18 @@ class Tree(pya.PCellDeclarationHelper):
             * (self.flow_width + 2 * self.control_width + 2 * self.vertical_gap)
             + (self.num_levels - 1) * self.control_gap
         )
-        self.make_tree(
+        bounds = self.make_tree(
             top=height / 2,
             left=-width / 2,
             right=width / 2,
             top_offset=0,
             level=self.num_levels,
         )
+
+        for bound in bounds:
+            self.cell.shapes(self.control_layer).insert(
+                pya.DBox(bound[1], bound[0] - self.control_width, width / 2, bound[0])
+            )
 
     def make_tree(self, top, left, right, top_offset, level):
         control_shapes = self.cell.shapes(self.control_layer)
@@ -76,7 +81,7 @@ class Tree(pya.PCellDeclarationHelper):
                     top - top_offset,
                 )
             )
-            return
+            return []
         else:
             root = pya.DBox(
                 mid - self.flow_width / 2,
@@ -159,7 +164,7 @@ class Tree(pya.PCellDeclarationHelper):
                 offset = 0
 
             flow_shapes.insert(split)
-            self.make_tree(
+            bounds = self.make_tree(
                 top=root.bottom + self.flow_width,
                 left=left,
                 right=mid,
@@ -173,6 +178,10 @@ class Tree(pya.PCellDeclarationHelper):
                 top_offset=offset,
                 level=level - 1,
             )
+            return bounds + [
+                (left_control.top, left_control.left),
+                (right_control.bottom + self.control_width, right_control.left),
+            ]
 
 
 MicrofluidicsLib()
