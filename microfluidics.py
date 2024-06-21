@@ -12,8 +12,10 @@ class Tree(pya.PCellDeclarationHelper):
     def __init__(self):
         super(Tree, self).__init__()
 
-        # declare the parameters
-        self.param("flow", self.TypeLayer, "Flow Layer", default=pya.LayerInfo(1, 0))
+        self.param(
+            "square", self.TypeLayer, "Flow Square Layer", default=pya.LayerInfo(1, 0)
+        )
+        self.param("round", self.TypeLayer, "Flow Round Layer")
         self.param("control", self.TypeLayer, "Control Layer")
         self.param("flow_width", self.TypeDouble, "Flow Channel Width", default=100)
         self.param(
@@ -33,10 +35,16 @@ class Tree(pya.PCellDeclarationHelper):
         self.param(
             "control_gap", self.TypeDouble, "Vertical Control-Control Gap", default=200
         )
+        self.param(
+            "bidirectional",
+            self.TypeBoolean,
+            "Control Spans Left-to-Right",
+            default=True,
+        )
 
     def display_text_impl(self):
         # Provide a descriptive text for the cell
-        return f"Tree(L={self.flow}, N={self.num_levels})"
+        return f"Tree(N={self.num_levels})"
 
     def can_create_from_shape_impl(self):
         return False
@@ -62,15 +70,21 @@ class Tree(pya.PCellDeclarationHelper):
 
         for bound in bounds:
             self.cell.shapes(self.control_layer).insert(
-                pya.DBox(bound[1], bound[0] - self.control_width, width / 2, bound[0])
+                pya.DBox(
+                    -width / 2 if self.bidirectional else bound[1],
+                    bound[0] - self.control_width,
+                    width / 2,
+                    bound[0],
+                )
             )
 
     def make_tree(self, top, left, right, top_offset, level):
         control_shapes = self.cell.shapes(self.control_layer)
-        flow_shapes = self.cell.shapes(self.flow_layer)
+        flow_square_shapes = self.cell.shapes(self.square_layer)
+        flow_round_shapes = self.cell.shapes(self.round_layer)
         mid = (left + right) / 2
         if level == 0:
-            flow_shapes.insert(
+            flow_square_shapes.insert(
                 pya.DBox(
                     mid - self.flow_width / 2,
                     top
@@ -93,7 +107,7 @@ class Tree(pya.PCellDeclarationHelper):
                 mid + self.flow_width / 2,
                 top - top_offset,
             )
-            flow_shapes.insert(root)
+            flow_square_shapes.insert(root)
 
             left_control = pya.DBox(
                 root.left - self.horizontal_gap - self.control_width,
@@ -134,7 +148,7 @@ class Tree(pya.PCellDeclarationHelper):
                     split.left + self.flow_width,
                     split.top,
                 )
-                flow_shapes.insert(left_flow)
+                flow_square_shapes.insert(left_flow)
 
                 right_flow = pya.DBox(
                     split.right,
@@ -142,9 +156,9 @@ class Tree(pya.PCellDeclarationHelper):
                     split.right - self.flow_width,
                     split.top,
                 )
-                flow_shapes.insert(right_flow)
+                flow_square_shapes.insert(right_flow)
 
-                flow_shapes.insert(
+                flow_square_shapes.insert(
                     pya.DBox(
                         q3 - self.flow_width / 2,
                         right_flow.bottom,
@@ -152,7 +166,7 @@ class Tree(pya.PCellDeclarationHelper):
                         right_flow.bottom + self.flow_width,
                     )
                 )
-                flow_shapes.insert(
+                flow_square_shapes.insert(
                     pya.DBox(
                         left_flow.left,
                         left_flow.bottom,
@@ -163,7 +177,25 @@ class Tree(pya.PCellDeclarationHelper):
             else:
                 offset = 0
 
-            flow_shapes.insert(split)
+            split_round = pya.DBox(
+                max(
+                    left_control.left - self.horizontal_gap,
+                    split.left + self.flow_width,
+                ),
+                split.bottom,
+                min(
+                    right_control.right + self.horizontal_gap,
+                    split.right - self.flow_width,
+                ),
+                split.top,
+            )
+            split_square = pya.Region(split.to_itype(self.layout.dbu)) - pya.Region(
+                split_round.to_itype(self.layout.dbu)
+            )
+            flow_square_shapes.insert(split_square)
+            split_round.left -= self.flow_width
+            split_round.right += self.flow_width
+            flow_round_shapes.insert(split_round)
             bounds = self.make_tree(
                 top=root.bottom + self.flow_width,
                 left=left,
