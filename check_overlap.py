@@ -11,7 +11,7 @@ holes = pya.Region()
 for overlap in (flow_region & control_region).each():
     if not overlap.is_box():
         raise ValueError("This script only allows rectangular overlaps.")
-          
+
     box = overlap.bbox().to_dtype(layout.dbu)
     hbox = pya.DBox(
         box.left - outer_offset,
@@ -19,20 +19,22 @@ for overlap in (flow_region & control_region).each():
         box.right + outer_offset,
         box.top - inner_offset,
     ).to_itype(layout.dbu)
-  
+
     vbox = pya.DBox(
         box.left + inner_offset,
         box.bottom - outer_offset,
         box.right - inner_offset,
         box.top + outer_offset,
     ).to_itype(layout.dbu)
-      
+
     if not control_region.covering(hbox).is_empty():
         holes.insert(hbox)
     elif not control_region.covering(vbox).is_empty():
         holes.insert(vbox)
     else:
-        raise ValueError("Found overlapping region which couldn't fit a horizontal or vertical hole.")
-  
+        raise ValueError(
+            "Found overlapping region which couldn't fit a horizontal or vertical hole."
+        )
+
 cell.shapes(3).clear()
 cell.shapes(3).insert(control_region - holes)
